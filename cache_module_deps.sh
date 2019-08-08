@@ -26,7 +26,7 @@ if [ ! -d ".module-dep-cache/$module" ] ; then
 	# Augment repo with module data
 	tstamp=$(echo $tag | rev | cut -f1,2 -d- | rev | sed -e 's/-/./')
 	stream=${module_ver/-/_}
-	wget -O .module-dep-cache/modulemd.x86_64.yaml https://kojipkgs.fedoraproject.org//packages/eclipse/$stream/$tstamp/files/module/modulemd.x86_64.txt
+	wget -O .module-dep-cache/modulemd.x86_64.yaml https://kojipkgs.fedoraproject.org//packages/$module_nom/$stream/$tstamp/files/module/modulemd.x86_64.txt
 	modifyrepo_c --mdtype=modules .module-dep-cache/modulemd.x86_64.yaml .module-dep-cache/$module/repodata
 	rm .module-dep-cache/modulemd.x86_64.yaml
 fi

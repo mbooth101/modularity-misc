@@ -80,21 +80,17 @@ if show:
 # Generate build order lists for build script
 f=open("build_order_graph.sh","w+")
 for idx, rank in enumerate(order):
-    f.write(f"declare -a RANK_{rank}")
+    f.write(f"declare -a RANK_{rank}\n")
     rank_array = ""
     for r in ranks[rank]:
-        if len(rank_array) != 0:
-            rank_array = rank_array + ", "
-        rank_array = rank_array + f"'{r}'"
-    rank_array = f"RANK_{rank}=(" + rank_array + ")"
+        rank_array = rank_array + f"'{r}' "
+    rank_array = f"RANK_{rank}=( " + rank_array + ")\n"
     f.write(rank_array)
-f.write(f"declare -a RANKS")
+f.write(f"declare -a RANKS\n")
 order_array = ""
 for o in order:
-    if len(order_array) != 0:
-        order_array = order_array + ", "
-    order_array = order_array + f"'RANK_{o}'"
-order_array = f"RANKS=(" + order_array + ")"
+    order_array = order_array + f"'RANK_{o}' "
+order_array = f"RANKS=( " + order_array + ")\n"
 f.write(order_array)
 f.close()
 

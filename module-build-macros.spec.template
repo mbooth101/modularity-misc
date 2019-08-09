@@ -1,6 +1,6 @@
 %global dist .module_f@@PLATFORM@@
-%global modularitylabel tycho:1.4:@@PLATFORM@@@@DATE@@:00000000
-%global _module_name tycho
+%global modularitylabel @@MODULE@@:1.4:@@PLATFORM@@@@DATE@@:00000000
+%global _module_name @@MODULE@@
 %global _module_stream 1.4
 %global _module_version @@PLATFORM@@@@DATE@@
 %global _module_context 00000000

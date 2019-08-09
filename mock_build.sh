@@ -74,9 +74,9 @@ function build_srpm() {
 # Build macro package
 DATE="$(date -u +%Y%m%d%H%M%S)"
 mkdir -p $BUILD_SRC_DIR/module-build-macros
-sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" \
+sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
 	module-build-macros.spec.template > $BUILD_SRC_DIR/module-build-macros/module-build-macros.spec
-sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" \
+sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
 	macros.modules.template > $BUILD_SRC_DIR/module-build-macros/macros.modules
 echo "$BUILD_OPTS" >> $BUILD_SRC_DIR/module-build-macros/macros.modules
 build_srpm module-build-macros

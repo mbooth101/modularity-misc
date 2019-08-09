@@ -55,7 +55,6 @@ EOF
 
 function build_srpm() {
 	# Build if not already built
-	set -x
 	rm -f $BUILD_SRC_DIR/$1/*.src.rpm
 	mock -r rpms/mock-$PLATFORM.cfg --init
 	if [ -n "$2" ] ; then
@@ -66,20 +65,20 @@ function build_srpm() {
 	if [ ! -f "$BUILD_RESULT_DIR/$SRPM" ] ; then
 		mock -r rpms/mock-$PLATFORM.cfg --no-clean --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
 	fi
-	set +x
 }
 
 # Build macro package
-DATE="$(date -u +%Y%m%d%H%M%S)"
-mkdir -p $BUILD_SRC_DIR/module-build-macros
-sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
-	module-build-macros.spec.template > $BUILD_SRC_DIR/module-build-macros/module-build-macros.spec
-sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
-	macros.modules.template > $BUILD_SRC_DIR/module-build-macros/macros.modules
-echo "$BUILD_OPTS" >> $BUILD_SRC_DIR/module-build-macros/macros.modules
-build_srpm module-build-macros
-createrepo_c $BUILD_RESULT_DIR
-cat <<EOF > $(pwd)/$BUILD_RESULT_DIR.repo
+if [ ! -f "$BUILD_RESULT_DIR/module-build-macros-0.1-1.module_f$PLATFORM.noarch.rpm" ] ; then
+	DATE="$(date -u +%Y%m%d%H%M%S)"
+	mkdir -p $BUILD_SRC_DIR/module-build-macros
+	sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
+		module-build-macros.spec.template > $BUILD_SRC_DIR/module-build-macros/module-build-macros.spec
+	sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
+		macros.modules.template > $BUILD_SRC_DIR/module-build-macros/macros.modules
+	echo "$BUILD_OPTS" >> $BUILD_SRC_DIR/module-build-macros/macros.modules
+	build_srpm module-build-macros
+	createrepo_c $BUILD_RESULT_DIR
+	cat <<EOF > $(pwd)/$BUILD_RESULT_DIR.repo
 [$MODULE]
 name=$MODULE
 baseurl=file://$(pwd)/$BUILD_RESULT_DIR
@@ -88,6 +87,7 @@ sslverify=0
 gpgcheck=0
 priority=1
 EOF
+fi
 
 for RANK in $RANKS ; do
 	CURRENT_RANK=$(echo -n $RANK | cut -f2 -d_)
@@ -106,7 +106,7 @@ for RANK in $RANKS ; do
 			if [ ! -d "$BUILD_SRC_DIR/$PKG" ] ; then
 				pushd $BUILD_SRC_DIR 2>&1 >/dev/null
 				fedpkg clone $PKG
-				(cd $PKG && fedpkg switch-branch $MODULE)
+				(cd $PKG && fedpkg switch-branch $MODULE && fedpkg --release=f$PLATFORM sources)
 				popd 2>&1 >/dev/null
 			fi
 			build_srpm $PKG module-build-macros

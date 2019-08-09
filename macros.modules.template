@@ -1,0 +1,12 @@
+# General macros set by MBS
+
+%dist .module_f@@PLATFORM@@
+%modularitylabel tycho:1.4:@@PLATFORM@@@@DATE@@:00000000
+%_module_build 1
+%_module_name tycho
+%_module_stream 1.4
+%_module_version @@PLATFORM@@@@DATE@@
+%_module_context 00000000
+
+# Macros set by module author:
+

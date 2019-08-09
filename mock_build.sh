@@ -54,6 +54,43 @@ skip_if_unavailable=False
 """
 EOF
 
+function build_srpm() {
+	# Regenerate source RPM
+	pushd $BUILD_SRC_DIR/$1 2>&1 >/dev/null
+	rm -f *.src.rpm
+	fedpkg --release=f$PLATFORM srpm
+	SRPM=$(ls *.src.rpm)
+	popd 2>&1 >/dev/null
+	# Build if not already built
+	if [ ! -f "$BUILD_RESULT_DIR/$SRPM" ] ; then
+		mock -r rpms/mock-$PLATFORM.cfg --init
+		if [ -n "$2" ] ; then
+			mock -r rpms/mock-$PLATFORM.cfg --install $2
+		fi
+		mock -r rpms/mock-$PLATFORM.cfg --no-clean --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
+	fi
+}
+
+# Build macro package
+DATE="$(date -u +%Y%m%d%H%M%S)"
+mkdir -p $BUILD_SRC_DIR/module-build-macros
+sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" \
+	module-build-macros.spec.template > $BUILD_SRC_DIR/module-build-macros/module-build-macros.spec
+sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" \
+	macros.modules.template > $BUILD_SRC_DIR/module-build-macros/macros.modules
+echo "$BUILD_OPTS" >> $BUILD_SRC_DIR/module-build-macros/macros.modules
+build_srpm module-build-macros
+createrepo_c $BUILD_RESULT_DIR
+cat <<EOF > $(pwd)/$BUILD_RESULT_DIR.repo
+[$MODULE]
+name=$MODULE
+baseurl=file://$(pwd)/$BUILD_RESULT_DIR
+enabled=1
+sslverify=0
+gpgcheck=0
+priority=1
+EOF
+
 for RANK in $RANKS ; do
 	CURRENT_RANK=$(echo -n $RANK | cut -f2 -d_)
 	BUILT_RANK=0
@@ -74,28 +111,10 @@ for RANK in $RANKS ; do
 				(cd $PKG && fedpkg switch-branch $MODULE)
 				popd 2>&1 >/dev/null
 			fi
-			# Regenerate source RPM
-			pushd $BUILD_SRC_DIR/$PKG 2>&1 >/dev/null
-			rm -f *.src.rpm
-			fedpkg --release=f$PLATFORM srpm
-			SRPM=$(ls *.src.rpm)
-			popd 2>&1 >/dev/null
-			# Build
-			if [ ! -f "$BUILD_RESULT_DIR/$SRPM" ] ; then
-				mock -r rpms/mock-$PLATFORM.cfg --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$PKG/$SRPM
-			fi
+			build_srpm $PKG module-build-macros
 		done
 		# Update repo data to include newly built rank
 		createrepo_c $BUILD_RESULT_DIR
-		cat <<EOF > $(pwd)/$BUILD_RESULT_DIR.repo
-[$MODULE]
-name=$MODULE
-baseurl=file://$(pwd)/$BUILD_RESULT_DIR
-enabled=1
-sslverify=0
-gpgcheck=0
-priority=1
-EOF
 		echo -n $CURRENT_RANK > $BUILD_RESULT_DIR/rank
 	fi
 	# Exit once the build rank is reached

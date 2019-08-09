@@ -80,7 +80,8 @@ if show:
 
 # Generate build order lists for build script
 f=open("build_order_graph.sh","w+")
-f.write("MODULE=" + os.path.basename(sys.argv[1]) + "\n")
+path_root, path_ext = os.path.splitext(sys.argv[1])
+f.write("MODULE=" + os.path.basename(path_root) + "\n")
 for idx, rank in enumerate(order):
     rank_array = ""
     for r in ranks[rank]:

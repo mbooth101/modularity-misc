@@ -6,10 +6,9 @@ set -e
 ./gen_build_order_graph.py ../tycho/tycho.yaml
 source ./build_order_graph.sh
 
-# Pass is a rank to build up to
+# Pass in a rank to build up to
 BUILD_RANK=${1:-""}
 
-MODULE=$(echo $MODULE | cut -d. -f1)
 BUILD_SRC_DIR=rpms/source/$MODULE
 BUILD_RESULT_DIR=rpms/results/$MODULE
 mkdir -p $BUILD_SRC_DIR $BUILD_RESULT_DIR
@@ -55,20 +54,19 @@ skip_if_unavailable=False
 EOF
 
 function build_srpm() {
-	# Regenerate source RPM
-	pushd $BUILD_SRC_DIR/$1 2>&1 >/dev/null
-	rm -f *.src.rpm
-	fedpkg --release=f$PLATFORM srpm
-	SRPM=$(ls *.src.rpm)
-	popd 2>&1 >/dev/null
 	# Build if not already built
+	set -x
+	rm -f $BUILD_SRC_DIR/$1/*.src.rpm
+	mock -r rpms/mock-$PLATFORM.cfg --init
+	if [ -n "$2" ] ; then
+		mock -r rpms/mock-$PLATFORM.cfg --install $2
+	fi
+	mock -r rpms/mock-$PLATFORM.cfg --no-clean --no-cleanup-after --resultdir=$BUILD_SRC_DIR/$1 --buildsrpm --spec $BUILD_SRC_DIR/$1/*.spec --sources $BUILD_SRC_DIR/$1
+	SRPM="$(cd $BUILD_SRC_DIR/$1 && ls *.src.rpm)"
 	if [ ! -f "$BUILD_RESULT_DIR/$SRPM" ] ; then
-		mock -r rpms/mock-$PLATFORM.cfg --init
-		if [ -n "$2" ] ; then
-			mock -r rpms/mock-$PLATFORM.cfg --install $2
-		fi
 		mock -r rpms/mock-$PLATFORM.cfg --no-clean --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
 	fi
+	set +x
 }
 
 # Build macro package

@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import sys
+import sys, os
 import yaml
 from pygraphviz import AGraph
 from subprocess import call
@@ -18,6 +18,7 @@ with open(sys.argv[1], 'r') as stream:
     yaml = yaml.safe_load(stream)
 
 rpms = yaml['data']['components']['rpms']
+buildopts = yaml['data']['buildopts']['rpms']['macros']
 
 g = AGraph(directed=True, name="G", strict=False, label="Build Order Graph")
 ranks = {}
@@ -79,19 +80,19 @@ if show:
 
 # Generate build order lists for build script
 f=open("build_order_graph.sh","w+")
+f.write("MODULE=" + os.path.basename(sys.argv[1]) + "\n")
 for idx, rank in enumerate(order):
-    f.write(f"declare -a RANK_{rank}\n")
     rank_array = ""
     for r in ranks[rank]:
-        rank_array = rank_array + f"'{r}' "
-    rank_array = f"RANK_{rank}=( " + rank_array + ")\n"
+        rank_array = rank_array + f"{r} "
+    rank_array = f"RANK_{rank}=\" " + rank_array + "\"\n"
     f.write(rank_array)
-f.write(f"declare -a RANKS\n")
 order_array = ""
 for o in order:
-    order_array = order_array + f"'RANK_{o}' "
-order_array = f"RANKS=( " + order_array + ")\n"
+    order_array = order_array + f"RANK_{o} "
+order_array = f"RANKS=\" " + order_array + "\"\n"
 f.write(order_array)
+f.write(f"BUILD_OPTS=\"" + buildopts + "\"\n")
 f.close()
 
 

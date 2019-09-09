@@ -10,9 +10,9 @@ module="$module_nom-$module_ver-$module_fed"
 echo "Finding latest tag for module: $module"
 tag="$(koji list-tags | grep "${module}" | grep -v '\-build$' | sort | tail -n1)"
 echo "Caching builds from tag: $tag"
-if [ ! -d ".module-dep-cache/$module" ] ; then
-	mkdir -p .module-dep-cache/$module
-	pushd .module-dep-cache/$module 2>&1 >/dev/null
+if [ ! -f "module-dep-cache/$module.cache" ] ; then
+	mkdir -p module-dep-cache/$module
+	pushd module-dep-cache/$module 2>&1 >/dev/null
 	pkgs=$(koji list-pkgs --quiet --tag=$tag | cut -f1 -d' ' | sort)
 	for pkg in $pkgs ; do
 		if [ "$pkg" = "module-build-macros" ] ; then
@@ -21,19 +21,20 @@ if [ ! -d ".module-dep-cache/$module" ] ; then
 		koji download-build --arch=noarch --arch=x86_64 --latestfrom=$tag $pkg
 	done
 	popd 2>&1 >/dev/null
-	# Create yum repo
-	createrepo_c .module-dep-cache/$module
-	# Augment repo with module data
-	tstamp=$(echo $tag | rev | cut -f1,2 -d- | rev | sed -e 's/-/./')
-	stream=${module_ver/-/_}
-	wget -O .module-dep-cache/modulemd.x86_64.yaml https://kojipkgs.fedoraproject.org//packages/$module_nom/$stream/$tstamp/files/module/modulemd.x86_64.txt
-	modifyrepo_c --mdtype=modules .module-dep-cache/modulemd.x86_64.yaml .module-dep-cache/$module/repodata
-	rm .module-dep-cache/modulemd.x86_64.yaml
+	touch module-dep-cache/$module.cache
 fi
-cat <<EOF > .module-dep-cache/$module.repo
-[$module]
-name=$module
-baseurl=file://$(pwd)/.module-dep-cache/$module
+
+# Create yum repo
+rm -rf module-dep-cache/repo/repodata
+mkdir -p module-dep-cache/repo
+cp -pr module-dep-cache/$module/* module-dep-cache/repo
+createrepo_c module-dep-cache/repo
+
+# Generate repo file
+cat <<EOF > module-dep-cache/module-cache.repo
+[module-cache]
+name=module-cache
+baseurl=file://$(pwd)/module-dep-cache/repo
 enabled=1
 sslverify=0
 gpgcheck=0

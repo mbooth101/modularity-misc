@@ -2,7 +2,7 @@
 
 script_location=$( (cd $(dirname $0) && pwd) )
 
-module=$(basename $script_location)
+module=$(ls *.yaml | cut -f1 -d.)
 
 mkdir -p rpms
 pushd rpms 2>&1 >/dev/null

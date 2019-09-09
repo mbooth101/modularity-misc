@@ -1,20 +1,22 @@
 #!/bin/bash
-
 set -e
 
+# Call like this:
+# ./mock_build.sh <module_name> <rank>
+
 # Generate build order
-./gen_build_order_graph.py ../tycho/tycho.yaml
+./gen_build_order_graph.py ../$1/$1.yaml
 source ./build_order_graph.sh
 
 # Pass in a rank to build up to
-BUILD_RANK=${1:-""}
+BUILD_RANK=${2:-""}
 
 BUILD_SRC_DIR=rpms/source/$MODULE
 BUILD_RESULT_DIR=rpms/results/$MODULE
 mkdir -p $BUILD_SRC_DIR $BUILD_RESULT_DIR
 
 # Fedora base platform version
-PLATFORM=30
+PLATFORM=31
 
 # Generate mock config
 cat > rpms/mock-$PLATFORM.cfg <<EOF
@@ -42,12 +44,21 @@ install_weak_deps=0
 metadata_expire=0
 best=1
 module_platform_id=platform:f$PLATFORM
-reposdir=$(pwd)/.module-dep-cache,$(pwd)/rpms/results
+reposdir=$(pwd)/module-dep-cache,$(pwd)/rpms/results
 [fedora]
 name=fedora
 metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-\$releasever&arch=\$basearch
 enabled=1
 priority=99
+cost=2000
+gpgcheck=0
+skip_if_unavailable=False
+[updates]
+name=updates
+metalink=https://mirrors.fedoraproject.org/metalink?repo=updates-released-f\$releasever&arch=\$basearch
+enabled=1
+priority=99
+cost=2000
 gpgcheck=0
 skip_if_unavailable=False
 """

@@ -12,6 +12,9 @@ MODULE_STREAM=$(cd ../$1 && git branch | grep '^\*' | cut -f2 -d' ')
 # Pass in a rank to build up to
 BUILD_RANK=${2:-""}
 
+# Pass in a list of packages to override the definition of the given rank
+BUILD_RANK_OVERRIDE=${3:-""}
+
 BUILD_SRC_DIR=rpms/source/$MODULE
 BUILD_RESULT_DIR=rpms/results/$MODULE
 mkdir -p $BUILD_SRC_DIR $BUILD_RESULT_DIR
@@ -20,7 +23,7 @@ mkdir -p $BUILD_SRC_DIR $BUILD_RESULT_DIR
 PLATFORM=31
 
 # Generate mock config
-cat > rpms/mock-$PLATFORM.cfg <<EOF
+cat > rpms/mock-$PLATFORM.cfg.new <<EOF
 config_opts['root'] = 'mock-$PLATFORM'
 config_opts['target_arch'] = 'x86_64'
 config_opts['legal_host_arches'] = ('x86_64',)
@@ -64,6 +67,13 @@ gpgcheck=0
 skip_if_unavailable=False
 """
 EOF
+
+# Only replace mock config if it changed (speeds up mock root initialisation)
+if [ "$(md5sum rpms/mock-$PLATFORM.cfg.new | cut -f1 -d' ')" = "$(md5sum rpms/mock-$PLATFORM.cfg | cut -f1 -d' ')" ] ; then
+	rm rpms/mock-$PLATFORM.cfg.new
+else
+	mv rpms/mock-$PLATFORM.cfg.new rpms/mock-$PLATFORM.cfg
+fi
 
 function build_srpm() {
 	# Build if not already built
@@ -112,8 +122,14 @@ for RANK in $RANKS ; do
 		echo "Skipping Rank: $CURRENT_RANK"
 	else
 		# Build all packages in the rank
-		echo "Building Rank: $CURRENT_RANK"
-		for PKG in ${!RANK} ; do
+		RANK_TO_BUILD="${!RANK}"
+		if [ "$BUILD_RANK" = "$CURRENT_RANK" ] ; then
+			if [ -n "$BUILD_RANK_OVERRIDE" ] ; then
+				RANK_TO_BUILD="$BUILD_RANK_OVERRIDE"
+			fi
+		fi
+		echo "Building Rank: $CURRENT_RANK (${RANK_TO_BUILD})"
+		for PKG in ${RANK_TO_BUILD} ; do
 			# Clone package
 			if [ ! -d "$BUILD_SRC_DIR/$PKG" ] ; then
 				pushd $BUILD_SRC_DIR 2>&1 >/dev/null
@@ -125,7 +141,10 @@ for RANK in $RANKS ; do
 		done
 		# Update repo data to include newly built rank
 		createrepo_c $BUILD_RESULT_DIR
-		echo -n $CURRENT_RANK > $BUILD_RESULT_DIR/rank
+		# Note which rank we finished if not overridden
+		if [ -z "$BUILD_RANK_OVERRIDE" ] ; then
+			echo -n $CURRENT_RANK > $BUILD_RESULT_DIR/rank
+		fi
 	fi
 	# Exit once the build rank is reached
 	if [ -n "$BUILD_RANK" ] ; then

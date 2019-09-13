@@ -7,6 +7,7 @@ set -e
 # Generate build order
 ./gen_build_order_graph.py ../$1/$1.yaml
 source ./build_order_graph.sh
+MODULE_STREAM=$(cd ../$1 && git branch | grep '^\*' | cut -f2 -d' ')
 
 # Pass in a rank to build up to
 BUILD_RANK=${2:-""}
@@ -82,7 +83,7 @@ function build_srpm() {
 if [ ! -f "$BUILD_RESULT_DIR/module-build-macros-0.1-1.module_f$PLATFORM.noarch.rpm" ] ; then
 	DATE="$(date -u +%Y%m%d%H%M%S)"
 	mkdir -p $BUILD_SRC_DIR/module-build-macros
-	sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
+	sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" -e "s/@@MODULE_STREAM@@/$MODULE_STREAM/" \
 		module-build-macros.spec.template > $BUILD_SRC_DIR/module-build-macros/module-build-macros.spec
 	sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
 		macros.modules.template > $BUILD_SRC_DIR/module-build-macros/macros.modules

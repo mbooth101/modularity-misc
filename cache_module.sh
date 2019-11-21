@@ -28,12 +28,12 @@ if [ ! -f "module-cache/$module.cache" ] ; then
 		koji download-build --arch=noarch --arch=x86_64 --latestfrom=$tag $pkg
 	done
 	popd 2>&1 >/dev/null
-	wget https://kojipkgs.fedoraproject.org//vol/fedora_koji_archive02/packages/$module_nom/$module_str/$module_ver/files/module/modulemd.x86_64.txt -O module-cache/$module-modulemd.txt
 	touch module-cache/$module.cache
 fi
 
 # Create yum repo
 createrepo_c module-cache/$module
+wget https://kojipkgs.fedoraproject.org//packages/$module_nom/$module_str/$module_ver/files/module/modulemd.x86_64.txt -O module-cache/$module-modulemd.txt
 modifyrepo_c --mdtype=modules module-cache/$module-modulemd.txt module-cache/$module/repodata
 
 # Generate repo file

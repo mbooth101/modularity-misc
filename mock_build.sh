@@ -25,6 +25,7 @@ PLATFORM=31
 # Generate mock config
 cat > rpms/mock-$PLATFORM.cfg.new <<EOF
 config_opts['root'] = 'mock-$PLATFORM'
+config_opts['module_enable'] = $BUILD_REQS
 config_opts['target_arch'] = 'x86_64'
 config_opts['legal_host_arches'] = ('x86_64',)
 config_opts['chroot_setup_cmd'] = 'install @buildsys-build java-1.8.0-openjdk-devel'
@@ -32,7 +33,7 @@ config_opts['dist'] = 'fc$PLATFORM'  # only useful for --resultdir variable subs
 config_opts['extra_chroot_dirs'] = [ '/run/lock', ]
 config_opts['releasever'] = '$PLATFORM'
 config_opts['package_manager'] = 'dnf'
-config_opts['yum.conf'] = """
+config_opts['dnf.conf'] = """
 [main]
 keepcache=1
 debuglevel=2
@@ -48,7 +49,7 @@ install_weak_deps=0
 metadata_expire=0
 best=1
 module_platform_id=platform:f$PLATFORM
-reposdir=$(pwd)/module-dep-cache,$(pwd)/rpms/results
+reposdir=$(pwd)/module-cache/conf,$(pwd)/rpms/results
 [fedora]
 name=fedora
 metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-\$releasever&arch=\$basearch
@@ -80,6 +81,7 @@ function build_srpm() {
 	rm -f $BUILD_SRC_DIR/$1/*.src.rpm
 	mock -r rpms/mock-$PLATFORM.cfg --init
 	if [ -n "$2" ] ; then
+		mock -r rpms/mock-$PLATFORM.cfg --pm-cmd module enable $MODULE
 		mock -r rpms/mock-$PLATFORM.cfg --install $2
 	fi
 	mock -r rpms/mock-$PLATFORM.cfg --no-clean --no-cleanup-after --resultdir=$BUILD_SRC_DIR/$1 --buildsrpm --spec $BUILD_SRC_DIR/$1/*.spec --sources $BUILD_SRC_DIR/$1
@@ -95,7 +97,7 @@ if [ ! -f "$BUILD_RESULT_DIR/module-build-macros-0.1-1.module_f$PLATFORM.noarch.
 	mkdir -p $BUILD_SRC_DIR/module-build-macros
 	sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" -e "s/@@MODULE_STREAM@@/$MODULE_STREAM/" \
 		module-build-macros.spec.template > $BUILD_SRC_DIR/module-build-macros/module-build-macros.spec
-	sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" \
+	sed -e "s/@@PLATFORM@@/$PLATFORM/g" -e "s/@@DATE@@/$DATE/" -e "s/@@MODULE@@/$MODULE/" -e "s/@@MODULE_STREAM@@/$MODULE_STREAM/" \
 		macros.modules.template > $BUILD_SRC_DIR/module-build-macros/macros.modules
 	echo "$BUILD_OPTS" >> $BUILD_SRC_DIR/module-build-macros/macros.modules
 	build_srpm module-build-macros

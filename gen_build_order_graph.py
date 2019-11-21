@@ -17,12 +17,18 @@ if len(sys.argv) > 2:
 with open(sys.argv[1], 'r') as stream:
     yaml = yaml.safe_load(stream)
 
-rpms = yaml['data']['components']['rpms']
+# Extract global build options
 buildopts = yaml['data']['buildopts']['rpms']['macros']
+
+# Extract modular build requirements
+buildrequires = []
+for br in yaml['data']['dependencies'][0]['buildrequires'].keys():
+    if br != 'platform':
+        buildrequires.append(br)
 
 g = AGraph(directed=True, name="G", strict=False, label="Build Order Graph")
 ranks = {}
-for key, value in rpms.items():
+for key, value in yaml['data']['components']['rpms'].items():
     # Add each buildorder rank as a distinct sub-graph
     rank = value['buildorder']
     if rank not in ranks:
@@ -94,6 +100,7 @@ for o in order:
 order_array = f"RANKS=\" " + order_array + "\"\n"
 f.write(order_array)
 f.write(f"BUILD_OPTS=\"" + buildopts + "\"\n")
+f.write(f"BUILD_REQS=\"['" + "', '".join(buildrequires) + "']\"\n")
 f.close()
 
 

@@ -37,7 +37,8 @@ createrepo_c module-cache/$module
 modifyrepo_c --mdtype=modules module-cache/$module-modulemd.txt module-cache/$module/repodata
 
 # Generate repo file
-cat <<EOF > module-cache/$module.repo
+mkdir -p module-cache/conf
+cat <<EOF > module-cache/conf/$module.repo
 [$module]
 name=$module
 baseurl=file://$(pwd)/module-cache/$module

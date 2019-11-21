@@ -1,7 +1,7 @@
 # General macros set by MBS
 
 %dist .module_f@@PLATFORM@@
-%modularitylabel @@MODULE@@:1.4:@@PLATFORM@@@@DATE@@:00000000
+%modularitylabel @@MODULE@@:@@MODULE_STREAM@@:@@PLATFORM@@@@DATE@@:00000000
 %_module_build 1
 %_module_name @@MODULE@@
 %_module_stream 1.4

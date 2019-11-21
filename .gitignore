@@ -1,4 +1,4 @@
-/module-dep-cache/
+/module-cache/
 /rpms/
 /build_order_graph*
 /*.swp

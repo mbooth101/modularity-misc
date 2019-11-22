@@ -2,6 +2,7 @@
 
 import sys, os
 import yaml
+from subprocess import run
 
 with open(sys.argv[1], 'r') as yaml_file:
     yml = yaml.safe_load(yaml_file)
@@ -10,10 +11,9 @@ repo = sys.argv[2]
 artifacts = [f[:-4] for f in os.listdir(repo) if f.endswith('.rpm')]
 rpms = {'rpms': []}
 for a in artifacts:
+    epoch = run(f"rpm -qp --queryformat='%{{EPOCH}}:%{{VERSION}}' {repo}/{a}.rpm", shell=True, capture_output=True).stdout
+    ev = epoch.decode("utf-8").strip().replace('(none)', '0')
     parts = a.split('-')
-    ev = ''.join(parts[-2:-1])
-    if ':' not in ev:
-        ev = f"0:{ev}"
     rpms['rpms'].append('-'.join(parts[:-2] + [ev] + parts[-1:]))
 yml['data']['artifacts'] = rpms
 

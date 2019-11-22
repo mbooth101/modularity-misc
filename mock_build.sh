@@ -96,7 +96,7 @@ function build_srpm() {
 	fi
 	mock -r $MOCK_CONFIG --no-clean --no-cleanup-after --resultdir=$BUILD_SRC_DIR/$1 --buildsrpm --spec $BUILD_SRC_DIR/$1/*.spec --sources $BUILD_SRC_DIR/$1
 	SRPM="$(cd $BUILD_SRC_DIR/$1 && ls *.src.rpm)"
-	mock -r $MOCK_CONFIG --no-clean --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
+	mock -r $MOCK_CONFIG --no-clean --no-cleanup-after --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
 }
 
 function update_repo() {

@@ -96,9 +96,7 @@ function build_srpm() {
 	fi
 	mock -r $MOCK_CONFIG --no-clean --no-cleanup-after --resultdir=$BUILD_SRC_DIR/$1 --buildsrpm --spec $BUILD_SRC_DIR/$1/*.spec --sources $BUILD_SRC_DIR/$1
 	SRPM="$(cd $BUILD_SRC_DIR/$1 && ls *.src.rpm)"
-	if [ ! -f "$BUILD_RESULT_DIR/$SRPM" ] ; then
-		mock -r $MOCK_CONFIG --no-clean --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
-	fi
+	mock -r $MOCK_CONFIG --no-clean --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
 }
 
 function update_repo() {
@@ -151,14 +149,24 @@ for RANK in $RANKS ; do
 		fi
 		echo "Building Rank: $CURRENT_RANK (${RANK_TO_BUILD})"
 		for PKG in ${RANK_TO_BUILD} ; do
+			do_build="true"
 			# Clone package
 			if [ ! -d "$BUILD_SRC_DIR/$PKG" ] ; then
+				# Not previously cloned
 				pushd $BUILD_SRC_DIR 2>&1 >/dev/null
 				fedpkg clone $PKG
 				(cd $PKG && fedpkg switch-branch $MODULE_NAME && fedpkg --release=f$PLATFORM sources)
 				popd 2>&1 >/dev/null
+			else
+				# Already cloned, was it already built?
+				if [ -f $BUILD_RESULT_DIR/$PKG*.src.rpm ] ; then
+					# SRPM already exists in results dir, so it was probably already built
+					do_build="false"
+				fi
 			fi
-			build_srpm $PKG module-build-macros
+			if [ "$do_build" = "true" ] ; then
+				build_srpm $PKG module-build-macros
+			fi
 		done
 		update_repo
 		# Note which rank we finished if not overridden

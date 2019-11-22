@@ -3,7 +3,7 @@
 import sys, os
 import yaml
 from pygraphviz import AGraph
-from subprocess import call
+from subprocess import run
 
 if len(sys.argv) < 2:
     sys.stderr.write("Must specify module yaml file\n")
@@ -14,21 +14,29 @@ if len(sys.argv) > 2:
     if sys.argv[2] == "--show":
         show = True
 
-with open(sys.argv[1], 'r') as stream:
-    yaml = yaml.safe_load(stream)
+with open(sys.argv[1], 'r') as yaml_file:
+    yml = yaml.safe_load(yaml_file)
+
+# Determine module and stream name
+gitrepo = os.path.dirname(sys.argv[1])
+module = os.path.basename(gitrepo)
+yml['data']['name'] = module
+gitbranchoutput = run("git branch | grep '^\*'", cwd=gitrepo, shell=True, capture_output=True).stdout
+stream = gitbranchoutput.decode("utf-8").strip().split(' ')[1]
+yml['data']['stream'] = stream
 
 # Extract global build options
-buildopts = yaml['data']['buildopts']['rpms']['macros']
+buildopts = yml['data']['buildopts']['rpms']['macros']
 
 # Extract modular build requirements
 buildrequires = []
-for br in yaml['data']['dependencies'][0]['buildrequires'].keys():
+for br in yml['data']['dependencies'][0]['buildrequires'].keys():
     if br != 'platform':
         buildrequires.append(br)
 
 g = AGraph(directed=True, name="G", strict=False, label="Build Order Graph")
 ranks = {}
-for key, value in yaml['data']['components']['rpms'].items():
+for key, value in yml['data']['components']['rpms'].items():
     # Add each buildorder rank as a distinct sub-graph
     rank = value['buildorder']
     if rank not in ranks:
@@ -82,12 +90,12 @@ for idx, rank in enumerate(order):
 # Generate graph
 g.draw("build_order_graph.png", prog="dot")
 if show:
-    call('eog build_order_graph.png &', shell=True)
+    run('eog build_order_graph.png &', shell=True)
 
 # Generate build order lists for build script
 f=open("build_order_graph.sh","w+")
-path_root, path_ext = os.path.splitext(sys.argv[1])
-f.write("MODULE=" + os.path.basename(path_root) + "\n")
+f.write(f"MODULE_NAME={module}\n")
+f.write(f"MODULE_STREAM={stream}\n")
 for idx, rank in enumerate(order):
     rank_array = ""
     for r in ranks[rank]:
@@ -103,4 +111,6 @@ f.write(f"BUILD_OPTS=\"" + buildopts + "\"\n")
 f.write(f"BUILD_REQS=\"['" + "', '".join(buildrequires) + "']\"\n")
 f.close()
 
-
+# Generate modified yaml file
+with open(f"{module}-{stream}.yaml", 'w') as yaml_file:
+        documents = yaml.dump(yml, yaml_file)

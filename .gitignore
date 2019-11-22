@@ -1,4 +1,5 @@
 /module-cache/
+/module-mockbuild/
 /rpms/
 /build_order_graph*
 /*.swp

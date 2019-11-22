@@ -7,7 +7,6 @@ set -e
 # Generate build order
 ./gen_build_order_graph.py ../$1/$1.yaml
 source ./build_order_graph.sh
-MODULE_STREAM=$(cd ../$1 && git branch | grep '^\*' | cut -f2 -d' ')
 
 # Pass in a rank to build up to
 BUILD_RANK=${2:-""}
@@ -15,15 +14,22 @@ BUILD_RANK=${2:-""}
 # Pass in a list of packages to override the definition of the given rank
 BUILD_RANK_OVERRIDE=${3:-""}
 
-BUILD_SRC_DIR=rpms/source/$MODULE
-BUILD_RESULT_DIR=rpms/results/$MODULE
-mkdir -p $BUILD_SRC_DIR $BUILD_RESULT_DIR
-
 # Fedora base platform version
-PLATFORM=31
+PLATFORM=32
+
+MODULE=$MODULE_NAME-$MODULE_STREAM-$PLATFORM
+
+MOCKBUILD_DIR=module-mockbuild
+DISTGIT_DIR=rpms
+BUILD_SRC_DIR=$DISTGIT_DIR/$MODULE
+BUILD_RESULT_DIR=$MOCKBUILD_DIR/$MODULE
+MOCK_CONFIG=$MOCKBUILD_DIR/$MODULE-mock.cfg
+
+mkdir -p $BUILD_SRC_DIR $BUILD_RESULT_DIR $MOCKBUILD_DIR/conf
+mv $MODULE_NAME-$MODULE_STREAM.yaml $MOCKBUILD_DIR/$MODULE.yaml
 
 # Generate mock config
-cat > rpms/mock-$PLATFORM.cfg.new <<EOF
+cat > $MOCK_CONFIG.new <<EOF
 config_opts['root'] = 'mock-$PLATFORM'
 config_opts['module_enable'] = $BUILD_REQS
 config_opts['target_arch'] = 'x86_64'
@@ -49,7 +55,7 @@ install_weak_deps=0
 metadata_expire=0
 best=1
 module_platform_id=platform:f$PLATFORM
-reposdir=$(pwd)/module-cache/conf,$(pwd)/rpms/results
+reposdir=$(pwd)/module-cache/conf,$(pwd)/$MOCKBUILD_DIR/conf
 [fedora]
 name=fedora
 metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-\$releasever&arch=\$basearch
@@ -70,24 +76,46 @@ skip_if_unavailable=False
 EOF
 
 # Only replace mock config if it changed (speeds up mock root initialisation)
-if [ "$(md5sum rpms/mock-$PLATFORM.cfg.new | cut -f1 -d' ')" = "$(md5sum rpms/mock-$PLATFORM.cfg | cut -f1 -d' ')" ] ; then
-	rm rpms/mock-$PLATFORM.cfg.new
+if [ -f "$MOCK_CONFIG" ] ; then
+	if [ "$(md5sum $MOCK_CONFIG.new | cut -f1 -d' ')" = "$(md5sum $MOCK_CONFIG | cut -f1 -d' ')" ] ; then
+		rm $MOCK_CONFIG.new
+	else
+		mv $MOCK_CONFIG.new $MOCK_CONFIG
+	fi
 else
-	mv rpms/mock-$PLATFORM.cfg.new rpms/mock-$PLATFORM.cfg
+	mv $MOCK_CONFIG.new $MOCK_CONFIG
 fi
 
 function build_srpm() {
 	# Build if not already built
 	rm -f $BUILD_SRC_DIR/$1/*.src.rpm
-	mock -r rpms/mock-$PLATFORM.cfg --init
+	mock -r $MOCK_CONFIG --init
 	if [ -n "$2" ] ; then
-		mock -r rpms/mock-$PLATFORM.cfg --pm-cmd module enable $MODULE
-		mock -r rpms/mock-$PLATFORM.cfg --install $2
+		mock -r $MOCK_CONFIG --pm-cmd module enable $MODULE_NAME
+		mock -r $MOCK_CONFIG --install $2
 	fi
-	mock -r rpms/mock-$PLATFORM.cfg --no-clean --no-cleanup-after --resultdir=$BUILD_SRC_DIR/$1 --buildsrpm --spec $BUILD_SRC_DIR/$1/*.spec --sources $BUILD_SRC_DIR/$1
+	mock -r $MOCK_CONFIG --no-clean --no-cleanup-after --resultdir=$BUILD_SRC_DIR/$1 --buildsrpm --spec $BUILD_SRC_DIR/$1/*.spec --sources $BUILD_SRC_DIR/$1
 	SRPM="$(cd $BUILD_SRC_DIR/$1 && ls *.src.rpm)"
 	if [ ! -f "$BUILD_RESULT_DIR/$SRPM" ] ; then
-		mock -r rpms/mock-$PLATFORM.cfg --no-clean --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
+		mock -r $MOCK_CONFIG --no-clean --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
+	fi
+}
+
+function update_repo() {
+	# Regenerate repository data to include newly built artifacts
+	createrepo_c $BUILD_RESULT_DIR
+	./fettle_yaml.py $BUILD_RESULT_DIR.yaml $BUILD_RESULT_DIR $BUILD_RESULT_DIR-modulemd.txt
+	modifyrepo_c --mdtype=modules $BUILD_RESULT_DIR-modulemd.txt $BUILD_RESULT_DIR/repodata
+	if [ ! -f "$MOCKBUILD_DIR/conf/$MODULE.repo" ] ; then
+		cat <<EOF > $MOCKBUILD_DIR/conf/$MODULE.repo
+[$MODULE]
+name=$MODULE
+baseurl=file://$(pwd)/$BUILD_RESULT_DIR
+enabled=1
+sslverify=0
+gpgcheck=0
+priority=1
+EOF
 	fi
 }
 
@@ -101,23 +129,14 @@ if [ ! -f "$BUILD_RESULT_DIR/module-build-macros-0.1-1.module_f$PLATFORM.noarch.
 		macros.modules.template > $BUILD_SRC_DIR/module-build-macros/macros.modules
 	echo "$BUILD_OPTS" >> $BUILD_SRC_DIR/module-build-macros/macros.modules
 	build_srpm module-build-macros
-	createrepo_c $BUILD_RESULT_DIR
-	cat <<EOF > $(pwd)/$BUILD_RESULT_DIR.repo
-[$MODULE]
-name=$MODULE
-baseurl=file://$(pwd)/$BUILD_RESULT_DIR
-enabled=1
-sslverify=0
-gpgcheck=0
-priority=1
-EOF
+	update_repo
 fi
 
 for RANK in $RANKS ; do
 	CURRENT_RANK=$(echo -n $RANK | cut -f2 -d_)
 	BUILT_RANK=0
-	if [ -f "$BUILD_RESULT_DIR/rank" ] ; then
-		BUILT_RANK="$(cat $BUILD_RESULT_DIR/rank)"
+	if [ -f "$BUILD_RESULT_DIR.rank" ] ; then
+		BUILT_RANK="$(cat $BUILD_RESULT_DIR.rank)"
 	fi
 	if [ "$CURRENT_RANK" -le "$BUILT_RANK" ] ; then
 		# Skip if rank is already built
@@ -136,16 +155,15 @@ for RANK in $RANKS ; do
 			if [ ! -d "$BUILD_SRC_DIR/$PKG" ] ; then
 				pushd $BUILD_SRC_DIR 2>&1 >/dev/null
 				fedpkg clone $PKG
-				(cd $PKG && fedpkg switch-branch $MODULE && fedpkg --release=f$PLATFORM sources)
+				(cd $PKG && fedpkg switch-branch $MODULE_NAME && fedpkg --release=f$PLATFORM sources)
 				popd 2>&1 >/dev/null
 			fi
 			build_srpm $PKG module-build-macros
 		done
-		# Update repo data to include newly built rank
-		createrepo_c $BUILD_RESULT_DIR
+		update_repo
 		# Note which rank we finished if not overridden
 		if [ -z "$BUILD_RANK_OVERRIDE" ] ; then
-			echo -n $CURRENT_RANK > $BUILD_RESULT_DIR/rank
+			echo -n $CURRENT_RANK > $BUILD_RESULT_DIR.rank
 		fi
 	fi
 	# Exit once the build rank is reached

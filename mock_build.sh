@@ -101,9 +101,7 @@ function build_srpm() {
 
 function update_repo() {
 	# Regenerate repository data to include newly built artifacts
-	createrepo_c $BUILD_RESULT_DIR
-	./fettle_yaml.py $BUILD_RESULT_DIR.yaml $BUILD_RESULT_DIR $BUILD_RESULT_DIR-modulemd.txt
-	modifyrepo_c --mdtype=modules $BUILD_RESULT_DIR-modulemd.txt $BUILD_RESULT_DIR/repodata
+	./fettle_yaml.py $BUILD_RESULT_DIR
 	if [ ! -f "$MOCKBUILD_DIR/conf/$MODULE.repo" ] ; then
 		cat <<EOF > $MOCKBUILD_DIR/conf/$MODULE.repo
 [$MODULE]

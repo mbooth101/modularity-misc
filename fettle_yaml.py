@@ -4,10 +4,11 @@ import sys, os
 import yaml
 from subprocess import run
 
-with open(sys.argv[1], 'r') as yaml_file:
+repo = sys.argv[1]
+
+with open(f"{repo}.yaml", 'r') as yaml_file:
     yml = yaml.safe_load(yaml_file)
 
-repo = sys.argv[2]
 artifacts = [f[:-4] for f in os.listdir(repo) if f.endswith('.rpm')]
 rpms = {'rpms': []}
 for a in artifacts:
@@ -17,5 +18,9 @@ for a in artifacts:
     rpms['rpms'].append('-'.join(parts[:-2] + [ev] + parts[-1:]))
 yml['data']['artifacts'] = rpms
 
-with open(sys.argv[3], 'w') as yaml_file:
+with open(f"{repo}-modulemd.txt", 'w') as yaml_file:
     yaml.dump(yml, yaml_file)
+
+# Regenerate repository metadata
+run(["createrepo_c", repo])
+run(["modifyrepo_c", "--mdtype=modules", f"{repo}-modulemd.txt", f"{repo}/repodata"])

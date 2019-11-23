@@ -99,22 +99,6 @@ function build_srpm() {
 	mock -r $MOCK_CONFIG --no-clean --no-cleanup-after --resultdir=$BUILD_RESULT_DIR --rebuild $BUILD_SRC_DIR/$1/$SRPM
 }
 
-function update_repo() {
-	# Regenerate repository data to include newly built artifacts
-	./fettle_yaml.py $BUILD_RESULT_DIR
-	if [ ! -f "$MOCKBUILD_DIR/conf/$MODULE.repo" ] ; then
-		cat <<EOF > $MOCKBUILD_DIR/conf/$MODULE.repo
-[$MODULE]
-name=$MODULE
-baseurl=file://$(pwd)/$BUILD_RESULT_DIR
-enabled=1
-sslverify=0
-gpgcheck=0
-priority=1
-EOF
-	fi
-}
-
 # Build macro package
 if [ ! -f "$BUILD_RESULT_DIR/module-build-macros-0.1-1.module_f$PLATFORM.noarch.rpm" ] ; then
 	DATE="$(date -u +%Y%m%d%H%M%S)"
@@ -125,7 +109,7 @@ if [ ! -f "$BUILD_RESULT_DIR/module-build-macros-0.1-1.module_f$PLATFORM.noarch.
 		macros.modules.template > $BUILD_SRC_DIR/module-build-macros/macros.modules
 	echo "$BUILD_OPTS" >> $BUILD_SRC_DIR/module-build-macros/macros.modules
 	build_srpm module-build-macros
-	update_repo
+	./update_repo.py $MODULE $MOCKBUILD_DIR
 fi
 
 for RANK in $RANKS ; do
@@ -166,7 +150,7 @@ for RANK in $RANKS ; do
 				build_srpm $PKG module-build-macros
 			fi
 		done
-		update_repo
+		./update_repo.py $MODULE $MOCKBUILD_DIR
 		# Note which rank we finished if not overridden
 		if [ -z "$BUILD_RANK_OVERRIDE" ] ; then
 			echo -n $CURRENT_RANK > $BUILD_RESULT_DIR.rank

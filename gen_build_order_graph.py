@@ -32,7 +32,11 @@ buildopts = yml['data']['buildopts']['rpms']['macros']
 buildrequires = []
 for br in yml['data']['dependencies'][0]['buildrequires'].keys():
     if br != 'platform':
-        buildrequires.append(br)
+        br_streams = yml['data']['dependencies'][0]['buildrequires'][br]
+        if br_streams:
+            buildrequires.append(f"{br}:{br_streams[-1]}")
+        else:
+            buildrequires.append(f"{br}")
 
 g = AGraph(directed=True, name="G", strict=False, label="Build Order Graph")
 ranks = {}

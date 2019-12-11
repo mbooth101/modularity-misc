@@ -113,7 +113,10 @@ for o in order:
 order_array = f"RANKS=\" RANK_0 " + order_array + "\"\n"
 f.write(order_array)
 f.write(f"BUILD_OPTS=\"" + buildopts + "\"\n")
-f.write(f"BUILD_REQS=\"['" + "', '".join(buildrequires) + "']\"\n")
+if buildrequires:
+    f.write(f"BUILD_REQS=\"['" + "', '".join(buildrequires) + "']\"\n")
+else:
+    f.write(f"BUILD_REQS=\"[]\"\n")
 f.close()
 
 # Generate modified yaml file

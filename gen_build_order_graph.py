@@ -100,6 +100,7 @@ if show:
 f=open("build_order_graph.sh","w+")
 f.write(f"MODULE_NAME={module}\n")
 f.write(f"MODULE_STREAM={stream}\n")
+f.write(f"RANK_0=\" module-build-macros \"\n")
 for idx, rank in enumerate(order):
     rank_array = ""
     for r in ranks[rank]:
@@ -109,7 +110,7 @@ for idx, rank in enumerate(order):
 order_array = ""
 for o in order:
     order_array = order_array + f"RANK_{o} "
-order_array = f"RANKS=\" " + order_array + "\"\n"
+order_array = f"RANKS=\" RANK_0 " + order_array + "\"\n"
 f.write(order_array)
 f.write(f"BUILD_OPTS=\"" + buildopts + "\"\n")
 f.write(f"BUILD_REQS=\"['" + "', '".join(buildrequires) + "']\"\n")

@@ -242,9 +242,14 @@ for RANK in $RANKS ; do
 			popd 2>&1 >/dev/null
 		else
 			# Already cloned, was it already built?
-			if [ -f $BUILD_RESULT_DIR/$PKG*.src.rpm ] ; then
-				# SRPM already exists in results dir, so it was probably already built
-				do_build="false"
+			SRC_RPM=$(cd $BUILD_SRC_DIR/$PKG && ls *.src.rpm 2>/dev/null)
+			if [ -n "$SRC_RPM" ] ; then
+				if [ -f "$BUILD_RESULT_DIR/$SRC_RPM" ] ; then
+					# SRPM already exists in results dir, so it was probably already built
+					do_build="false"
+				fi
+			else
+				(cd $BUILD_SRC_DIR/$PKG && fedpkg --release=f$PLATFORM sources)
 			fi
 		fi
 		if [ "$do_build" = "true" ] ; then

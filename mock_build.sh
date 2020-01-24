@@ -13,6 +13,8 @@ BUILD_RANK=${2:-""}
 # Pass in a list of packages to override the definition of the given rank
 BUILD_RANK_OVERRIDE=${3:-""}
 
+BUILDERS=${4:-4}
+
 # Fedora base platform version
 PLATFORM=31
 
@@ -229,16 +231,18 @@ for RANK in $RANKS ; do
 	if [ "$CURRENT_RANK" = "0" ] ; then
 		queue_open 1
 	else
-		queue_open 4
+		queue_open $BUILDERS
 	fi
-	for PKG in ${CURRENT_RANK_PKGS} ; do
+	for PKGREF in ${CURRENT_RANK_PKGS} ; do
+		PKG=$(echo "$PKGREF" | cut -d@ -f1)
+		REF=$(echo "$PKGREF" | cut -d@ -f2)
 		do_build="true"
 		# Clone package
 		if [ ! -d "$BUILD_SRC_DIR/$PKG" ] ; then
 			# Not previously cloned
 			pushd $BUILD_SRC_DIR 2>&1 >/dev/null
 			fedpkg clone $PKG
-			(cd $PKG && fedpkg switch-branch $MODULE_NAME && fedpkg --release=f$PLATFORM sources)
+			(cd $PKG && fedpkg switch-branch $REF && fedpkg --release=f$PLATFORM sources)
 			popd 2>&1 >/dev/null
 		else
 			# Already cloned, was it already built?

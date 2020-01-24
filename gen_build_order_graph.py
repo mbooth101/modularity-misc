@@ -40,6 +40,7 @@ for br in yml['data']['dependencies'][0]['buildrequires'].keys():
 
 g = AGraph(directed=True, name="G", strict=False, label="Build Order Graph")
 ranks = {}
+refs = {}
 for key, value in yml['data']['components']['rpms'].items():
     # Add each buildorder rank as a distinct sub-graph
     rank = value['buildorder']
@@ -51,6 +52,9 @@ for key, value in yml['data']['components']['rpms'].items():
     if subg is None:
         subg = g.add_subgraph(name=f"{rank}", label=f"Build Order {rank}", rank="same")
     subg.add_node(f"{rank}")
+    # Extract git ref from which to build
+    if key not in refs:
+        refs[key] = value['ref']
     # Parse the dependency relationships
     reqs = []
     breqs = []
@@ -104,7 +108,7 @@ f.write(f"RANK_0=\" module-build-macros \"\n")
 for idx, rank in enumerate(order):
     rank_array = ""
     for r in ranks[rank]:
-        rank_array = rank_array + f"{r} "
+        rank_array = rank_array + f"{r}@{refs[r]} "
     rank_array = f"RANK_{rank}=\" " + rank_array + "\"\n"
     f.write(rank_array)
 order_array = ""

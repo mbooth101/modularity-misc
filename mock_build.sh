@@ -13,14 +13,14 @@ BUILD_RANK=${2:-""}
 # Pass in a list of packages to override the definition of the given rank
 BUILD_RANK_OVERRIDE=${3:-""}
 
-BUILDERS=${4:-4}
+BUILDERS=${4:-2}
 
 # Fedora base platform version
-PLATFORM=31
+PLATFORM=32
 
 MODULE=$MODULE_NAME-$MODULE_STREAM-$PLATFORM
 
-MOCKBUILD_DIR=module-mockbuild
+MOCKBUILD_DIR=module-cache
 DISTGIT_DIR=rpms
 BUILD_SRC_DIR=$DISTGIT_DIR/$MODULE
 BUILD_RESULT_DIR=$MOCKBUILD_DIR/$MODULE
@@ -29,12 +29,12 @@ mkdir -p $BUILD_SRC_DIR $BUILD_RESULT_DIR $MOCKBUILD_DIR/conf
 mv $MODULE_NAME-$MODULE_STREAM.yaml $MOCKBUILD_DIR/$MODULE.yaml
 
 function build_srpm() {
-	local MOCK_CONFIG=$MOCKBUILD_DIR/$MODULE-mock-$1.cfg
+	mkdir -p mock
+	local MOCK_CONFIG=mock/$MODULE-mock-$1.cfg
 
 	# Generate new mock config file
 	cat > $MOCK_CONFIG.new <<EOF
 config_opts['root'] = 'mock-$PLATFORM-$1'
-config_opts['module_enable'] = $BUILD_REQS
 config_opts['target_arch'] = 'x86_64'
 config_opts['legal_host_arches'] = ('x86_64',)
 config_opts['chroot_setup_cmd'] = 'install @buildsys-build java-1.8.0-openjdk-devel'
@@ -58,7 +58,6 @@ install_weak_deps=0
 metadata_expire=0
 best=1
 module_platform_id=platform:f$PLATFORM
-reposdir=$(pwd)/module-cache/conf,$(pwd)/$MOCKBUILD_DIR/conf
 [fedora]
 name=fedora
 metalink=https://mirrors.fedoraproject.org/metalink?repo=fedora-\$releasever&arch=\$basearch
@@ -77,6 +76,20 @@ gpgcheck=0
 skip_if_unavailable=False
 """
 EOF
+	# Add repos depending on the modular requirements
+	for REQ in $BUILD_REQS ; do
+		#if [ "$repo" = "$MOCKBUILD_DIR/conf/$MODULE.repo" -o "$repo" = ] ; then
+		#	cat $MOCKBUILD_DIR/conf/$MODULE.repo >> $MOCK_CONFIG.new
+		#fi
+		echo "TODO"
+	done
+	cat module-cache/conf/javapackages-tools-201801-28.repo >> $MOCK_CONFIG.new
+	cat module-cache/conf/tycho-1.6-32.repo >> $MOCK_CONFIG.new
+	if [ -f "$MOCKBUILD_DIR/conf/$MODULE.repo" ] ; then
+		cat $MOCKBUILD_DIR/conf/$MODULE.repo >> $MOCK_CONFIG.new
+	fi
+	sed -i -e '/^"""$/d' $MOCK_CONFIG.new && echo '"""' >> $MOCK_CONFIG.new
+
 
 	# Only replace mock config if it changed (speeds up mock root initialisation)
 	if [ -f "$MOCK_CONFIG" ] ; then
@@ -94,7 +107,6 @@ EOF
 	rm -f $BUILD_SRC_DIR/$2/*.rpm
 	mock -r $MOCK_CONFIG --init
 	if [ -n "$3" ] ; then
-		mock -r $MOCK_CONFIG --pm-cmd module enable $MODULE_NAME
 		mock -r $MOCK_CONFIG --install $3
 	fi
 	mock -r $MOCK_CONFIG --no-clean --no-cleanup-after --resultdir=$BUILD_SRC_DIR/$2 --buildsrpm --spec $BUILD_SRC_DIR/$2/*.spec --sources $BUILD_SRC_DIR/$2
@@ -264,7 +276,7 @@ for RANK in $RANKS ; do
 		fi
 	done
 	queue_close
-	./update_repo.py $MODULE $MOCKBUILD_DIR
+	./update_repo.sh $MODULE
 	# Exit once the given build rank is reached
 	if [ -n "$BUILD_RANK" ] ; then
 		if [ "$BUILD_RANK" = "$CURRENT_RANK" ] ; then

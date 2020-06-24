@@ -34,7 +34,7 @@ for br in yml['data']['dependencies'][0]['buildrequires'].keys():
     if br != 'platform':
         br_streams = yml['data']['dependencies'][0]['buildrequires'][br]
         if br_streams:
-            buildrequires.append(f"{br}:{br_streams[-1]}")
+            buildrequires.append(f"{br}-{br_streams[-1]}")
         else:
             buildrequires.append(f"{br}")
 
@@ -118,9 +118,9 @@ order_array = f"RANKS=\" RANK_0 " + order_array + "\"\n"
 f.write(order_array)
 f.write(f"BUILD_OPTS=\"" + buildopts + "\"\n")
 if buildrequires:
-    f.write(f"BUILD_REQS=\"['" + "', '".join(buildrequires) + "']\"\n")
+    f.write(f"BUILD_REQS=\"" + " ".join(buildrequires) + "\"\n")
 else:
-    f.write(f"BUILD_REQS=\"[]\"\n")
+    f.write(f"BUILD_REQS=\"\"\n")
 f.close()
 
 # Generate modified yaml file
